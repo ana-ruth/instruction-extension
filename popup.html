@@ -5,7 +5,7 @@
   <title>Website Helper</title>
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <style>
-    body { font-family: Arial; margin: 0; padding: 12px; width: 280px; background: #f9f9f9; }
+    body { font-family: Arial; margin: 0; padding: 12vh; width: 280vh; background: #f9f9f9; }
     h1 { font-size: 16px; margin-bottom: 8px; }
     ol { padding-left: 20px; }
     li { margin-bottom: 6px; line-height: 1.4; }
@@ -13,13 +13,24 @@
   </style>
 </head>
 <body>
-  <h1>Steps to Follow</h1>
-  <ol>
-    <li>Open the website you want to use.</li>
-    <li>Find the <strong>Sign In</strong> button.</li>
-    <li>Enter your login details.</li>
-    <li>Click <strong>Submit</strong> to log in.</li>
-  </ol>
-  <p class="note">Edit these steps in <code>popup.html</code>.</p>
+<header>
+    <h1>Elder Guide</h1>
+  </header>
+
+  <main>
+    <section id="chat-history" aria-live="polite">
+      <!-- Messages will be appended here -->
+    </section>
+
+    <form id="chat-form">
+      <label for="user-input">How can i help you?</label><br>
+      <input type="text" id="user-input" placeholder="Ask for guidance..." autocomplete="off" required />
+      <button type="submit" id="send-btn">Send</button>
+    </form>
+  </main>
+
+  <!-- JS will be added in next phase -->
+  <script src="popup.js"></script>
+
 </body>
 </html>
