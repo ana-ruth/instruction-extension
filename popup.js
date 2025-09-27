@@ -4,6 +4,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Get references to the key UI elements
     const sendButton = document.getElementById('send-btn');
     const userInput = document.getElementById('user-input');
+    const chatHistory = document.getElementById('chat-history'); 
 
     // Attach the event listener to the Send button
     sendButton.addEventListener('click', () => {
