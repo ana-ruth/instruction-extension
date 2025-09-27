@@ -16,9 +16,19 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
 
     if (message.type === 'GET_CONTEXT') {
-        sendResponse(scrapeContext());
-        return true;
+        const contextData = scrapeContext();
+
+        // Send the scraped data back to the Service Worker (P3)
+        sendResponse({ 
+            type: 'CONTEXT_RESPONSE', 
+            context: contextData 
+        });
+        
+        // Must return true to signal Chrome that sendResponse will be called asynchronously.
+        // Even though scrapeContext is synchronous, the messaging flow is asynchronous.
+        return true; 
     }
+
 
 });
 

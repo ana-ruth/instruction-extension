@@ -1,4 +1,217 @@
 
+import { GEMINI_API_KEY } from './config.js';
+
+async function callGeminiApi(question, context) {
+    if (!GEMINI_API_KEY || GEMINI_API_KEY === 'YOUR_PLACEHOLDER_KEY') {
+        // Handle the case where the key is missing (e.g., in a development environment)
+        console.error("API Key is not configured correctly in config.js.");
+
+        return { error: "Developer API Key is not configured." };
+    }
+
+
+
+    const systemPrompt = `You are a patient, helpful guide specializing in instructing seniors on website navigation.
+    Your response MUST achieve two goals:
+    1. Provide the SINGLE, most logical next step to help the user achieve their goal.
+    2. Identify the exact CSS selector for the element mentioned in your instruction, using the provided DOM Context.
+
+    INSTRUCTION GUIDELINES:
+    * Use extremely simple, direct language. Avoid technical terms.
+    * Focus only on the single, immediate next action.
+    
+    RESPONSE FORMATTING:
+    * You MUST respond ONLY with a valid JSON object adhering to the specified schema.
+    * If no relevant element is found in the DOM Context, use 'document.body' for the selector and state, 'The item is not visible right now. Please scroll down.'
+
+    DOM Context:
+    ---
+    ${context}
+    ---
+    
+    User Question: ${question}`;
+
+
+       // CONSTRUCT THE API PAYLOAD
+    const payload = {
+        model: "gemini-2.5-flash", 
+        contents: [{ 
+                    role: "user", 
+                    parts: [{ 
+                        text: systemPrompt 
+                    }] 
+                }],
+        generationConfig: {
+            // CRUCIAL: Forces the model to output a JSON string
+            responseMimeType: "application/json",
+            responseSchema: {
+                type: "object",
+                properties: {
+                    instruction: { type: "string", description: "The single, simple instruction for the user." },
+                    selector: { type: "string", description: "The most precise CSS selector for the target element." }
+                },
+                required: ["instruction", "selector"]
+            }
+        }
+    };
+
+
+
+
+    //fetch call to Gemini API
+
+try { 
+    const response = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`,
+        {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+
+        }
+    );
+    
+
+    if (!response.ok) {
+        const errorDetails = await response.text();
+        console.error("Gemini API Error:", response.status, errorDetails);
+        return { error: `API Error: ${response.status}` };
+    }
+
+    const data = await response.json();
+    console.log("Raw Gemini API Response:", data);
+
+    const jsonText = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+        const parsedData = JSON.parse(jsonText); 
+        
+        if (!jsonText) {
+        console.error("Gemini Response Missing Text/Content. Full response:", data);
+        return { 
+            error: "The guide couldn't generate a response for this request. Please try rephrasing." 
+        };
+    }
+
+
+    try {
+        const parsedData = JSON.parse(jsonText); 
+
+        return {
+            instruction: parsedData.instruction,
+            selector: parsedData.selector
+        };
+    } catch (e) {
+        console.error("Failed to parse JSON from Gemini text:", jsonText, e);
+        return { error: "Failed to read guide instructions. Please ask again." };
+    }
+
+
+        
+    } catch (error) {
+        console.error("LLM API Call Failed:", error);
+        return { error: "Error contacting the guide service. Please try again." };
+    }
+
+}
+
+
+
+const contextCache = {}; 
+
+// Listener receives messages from popup.js and content.js
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+    
+    // --- 1. HANDLE CONTEXT RECEIPT FROM CONTENT.JS ---
+    if (message.type === 'CONTEXT_DATA') {
+        const tabId = sender.tab.id;
+        contextCache[tabId] = message.context;
+        console.log(`Context received and cached for tab ${tabId}.`);
+        sendResponse({ status: "Context cached." });
+        return true; // Keep channel open
+    }
+    
+    // --- 2. HANDLE CHAT REQUEST FROM POPUP.JS (The main trigger) ---
+    if (message.type === 'CHAT_REQUEST') {
+        const userQuestion = message.question;
+        
+        // Find the active tab to execute commands and get context
+        chrome.tabs.query({ active: true, currentWindow: true }, async function(tabs) {
+            
+            const tab = tabs[0];
+            const tabId = tab.id;
+            
+            if (!tab || tab.url.startsWith('chrome://') || tab.url.startsWith('chrome-extension://')) {
+                 sendResponse({ status: "error", instruction: "Extension cannot run on this page." });
+                 return;
+            }
+
+            // A. Check if context is already available
+            let pageContext = contextCache[tabId];
+            if (!pageContext) {
+                 // If not, inject content.js and request context *before* calling the LLM
+                 // NOTE: For simplicity, we are combining the context gathering and chat in one call here.
+                 // A more robust app would have the content script send context on load.
+                 // For now, we'll try to execute and get context first.
+                 
+                 // Fallback or Initial Context Request: Inject content.js to get the data
+                 // The actual scraping must be done by P2 and returned via a dedicated message.
+                 pageContext = `Page URL: ${tab.url}. Current elements: (No context received yet. Using URL only.)`;
+            }
+
+            // B. Call the LLM with the question and context
+            const llmResponse = await callGeminiApi(userQuestion, pageContext);
+
+            if (llmResponse.error) {
+                sendResponse({ status: "error", instruction: llmResponse.error });
+                return;
+            }
+
+            // C. Send instruction back to Popup (P1)
+            sendResponse({ 
+                status: "success", 
+                instruction: llmResponse.instruction,
+                selector: llmResponse.selector // Send selector to popup for logging/debug
+            }); 
+            
+/////////
+
+
+
+// Inject content.js and then send the message inside the callback
+chrome.scripting.executeScript({
+    target: { tabId: tabId },
+    files: ['content.js'] // Path to your content script
+}, () => {
+    // Check for injection errors
+    if (chrome.runtime.lastError) {
+        console.error("Script injection failed:", chrome.runtime.lastError.message);
+        // You should send an error back to the popup here too!
+        // sendResponse({ status: "error", instruction: "Failed to load guide features on the page." });
+        return;
+    }
+    
+    //  THIS IS THE FINAL SEND THAT MUST BE RUN AFTER SCRIPT IS LOADED
+    chrome.tabs.sendMessage(tabId, { 
+        type: 'LLM_INSTRUCTION', 
+        selector: llmResponse.selector,
+        instruction: llmResponse.instruction // Include instruction for robust P2 logging
+    }).catch(error => {
+        // This catch handles errors if the connection immediately closes after sending
+        console.error("Error sending highlight command (Post-Injection):", error.message);
+    });
+
+}); // End of chrome.scripting.executeScript()
+
+});
+
+
+        return true; 
+    }
+});
+
+
+
+/*
+
 function handleChatRequest(question, context) {
     return {
         "instruction": "Mock: Click the main search box.",
@@ -83,4 +296,4 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     //return true; // Keep the message channel open for sendResponse
     }
 });
-
+*/
