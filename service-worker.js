@@ -1,3 +1,12 @@
+
+function handleChatRequest(question, context) {
+    return {
+        "instruction": "Mock: Click the main search box.",
+        "selector": "#search-box"
+    };
+}
+
+
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.type === 'CHAT_REQUEST') {
     // *** Mock LLM Response Structure ***
