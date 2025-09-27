@@ -1,0 +1,10 @@
+{
+  "manifest_version": 3,
+  "name": "Website Helper",
+  "version": "1.0",
+  "description": "Shows step-by-step instructions for websites.",
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Website Helper"
+  }
+}
