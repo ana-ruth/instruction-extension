@@ -1,6 +1,54 @@
 // content.js
 // P2's focus: DOM Scraper & Highlighting Logic
 
+//Phase 1
+// 1. Set up the message listener to receive commands from the service worker (P3)
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+    
+    // Listen ONLY for the LLM_INSTRUCTION command
+    if (message.type === 'LLM_INSTRUCTION' && message.selector) {
+        
+        console.log("P2: Received LLM_INSTRUCTION:", message.instruction);
+        console.log("P2: Target Selector:", message.selector);
+        
+        // Execute the highlight action immediately
+        highlightElement(message.selector);
+    }
+
+
+    if (message.type === 'GET_CONTEXT') {
+        sendResponse(scrapeContext());
+        return true;
+    }
+
+
+});
+
+
+
+
+function scrapeContext() {
+    console.log("P2: Executing scrapeContext() to gather basic page information.");
+    
+    return {
+        // Retrieves the text content of the HTML <title> tag
+        title: document.title, 
+        
+        // Retrieves the full URL of the current window/tab
+        url: window.location.href,
+        
+        // Optionally add a timestamp for diagnostic purposes
+        timestamp: Date.now() 
+    };
+}
+
+
+
+
+
+
+
+
 
 /**
  * PHASE 2: Highlighting Logic (Tasks 10-12h)
