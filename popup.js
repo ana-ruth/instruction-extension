@@ -1,3 +1,19 @@
+
+function speakInstruction(text) {
+        if ('speechSynthesis' in window) {
+            window.speechSynthesis.cancel();
+            const utterance = new SpeechSynthesisUtterance(text);
+            utterance.rate = 0.9;
+            window.speechSynthesis.speak(utterance);
+        } else {
+            console.warn("TTS not supported.");
+        }
+    }////////////
+
+
+
+
+
 document.addEventListener('DOMContentLoaded', () => {
 
     // Get references to the key UI elements
@@ -46,6 +62,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             processResponse(response);
+            speakInstruction(response.instruction);
         });
     }
 
@@ -76,6 +93,13 @@ document.addEventListener('DOMContentLoaded', () => {
             type: 'CHAT_REQUEST',
             question: question
         }, (response) => {
+
+
+
+            if (response.status === "success") {
+                speakInstruction(response.instruction); // Speak the first instruction!
+            }
+
 
             // Remove the specific loading indicator that was created
             initialLoadingMessage.remove();

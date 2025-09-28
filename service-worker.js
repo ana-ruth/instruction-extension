@@ -196,7 +196,7 @@ const getContext = (tabId, tabUrl) => {
 const CONVERSATION_KEY = 'guideConversation'; // Key for chrome.storage
 
 // Utility function to inject and send the command to P2
-function executeStep(tabId, step) {
+function executeStep(tabId, step, shouldSpeak = false) {
     // This function ensures the script is loaded on the current tab (new or old page)
     chrome.scripting.executeScript({
         target: { tabId: tabId },
@@ -209,7 +209,8 @@ function executeStep(tabId, step) {
         chrome.tabs.sendMessage(tabId, { 
             type: 'LLM_INSTRUCTION', 
             selector: step.selector,
-            instruction: step.instruction
+            instruction: step.instruction,
+            shouldSpeak: shouldSpeak////////
         }).catch(error => {
             console.error("Error sending highlight command:", error.message);
         });
@@ -279,7 +280,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                         selector: currentStep.selector,
                         isLastStep: isLastStep
                     };
-                    executeStep(tabId, currentStep); // Execute step 0 immediately
+                    executeStep(tabId, currentStep, true); // Execute step 0 immediately
 
                 // --- B. ADVANCE STEP REQUEST: MOVE TO NEXT STEP ---
                 } else if (message.type === 'ADVANCE_STEP') {

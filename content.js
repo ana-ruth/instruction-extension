@@ -1,6 +1,7 @@
 // content.js
 // P2's focus: DOM Scraper & Highlighting Logic
-//document.addEventListener('DOMContentLoaded', () => {
+
+
 
 
 // message listener to receive commands from the service worker (P3)
@@ -14,6 +15,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
         // Execute the highlight action immediately
         highlightElement(message.selector);
+
+
     }
 
 
