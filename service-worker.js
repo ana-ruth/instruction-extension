@@ -1,6 +1,15 @@
 
 import { GEMINI_API_KEY } from './config.js';
 
+
+chrome.runtime.onInstalled.addListener(() => {
+    // This tells Chrome to open the side panel when the action (icon click) occurs.
+    chrome.sidePanel.setPanelBehavior({
+        openPanelOnActionClick: true
+    }).catch((error) => console.error("Error setting sidePanel behavior:", error));
+});
+
+
 async function callGeminiApi(question, context) {
     if (!GEMINI_API_KEY || GEMINI_API_KEY === 'YOUR_PLACEHOLDER_KEY') {
         // Handle the case where the key is missing (e.g., in a development environment)

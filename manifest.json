@@ -2,10 +2,14 @@
   "manifest_version": 3,
   "name": "InstructionGiver",
   "version": "1.0",
-  "permissions": ["storage", "activeTab", "scripting", "tabs"],
+  "permissions": ["sidePanel","storage", "activeTab", "scripting", "tabs"],
   "host_permissions": ["<all_urls>", "https://api.gemini.google.com/*"],
   "action": {
-    "default_popup": "popup.html"
+ "default_title": "Elder Guide Chat" 
+ },
+
+ "side_panel": {
+    "default_path": "popup.html" 
   },
 
   "background": {

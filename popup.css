@@ -1,17 +1,3 @@
-/* 
-body { 
-    font-family: Arial; 
-    margin: 0; 
-    padding: 12vh; 
-    width: 20rem;
-    height: 10rem;
-    background: #F9F9F6; }
-
-h1 { 
-    font-size: 16px; 
-    margin-bottom: 8px; 
-} */
-
 
 :root {
   --bg: #faf7f2;                   /* soft beige */
@@ -26,8 +12,9 @@ h1 {
   --ring: #c9b7ed;                 /* soft lavender focus */
   --cardShadow: 0 10px 26px rgba(33, 56, 150, 0.10);
   --radius: 18px;
-  --font-size-base: 19px;
+  --font-size-base: 19px;          /* Excellent base font size for elders */
 }
+
 
 body, input, button {
   font-family: ui-rounded, system-ui, -apple-system, "Segoe UI", "SF Pro Rounded", "Noto Sans", Arial, sans-serif;
@@ -37,13 +24,13 @@ body, input, button {
 }
 
 body.popup {
-  width: 400px;
-  height: 600px;
-  min-height: 600px;
-  padding: 20px;
-  display: grid;
-  grid-template-rows: auto 1fr auto;
-  gap: 16px;
+  width: 100%;                  /* REMOVE FIXED WIDTH */
+  height: 100vh;                 /* FILL VIEWPORT HEIGHT */
+  min-height: 100vh;
+  padding: 0;                    /* Remove padding to fill edge-to-edge (optional) */
+  display: flex;                 /* Change to flex column for better full-page layout */
+  flex-direction: column;
+  gap: 0;                        /* Manage gaps with margin/padding inside sections */
   color: var(--text);
   background:
     radial-gradient(900px 400px at 8% -20%, var(--brand-soft), transparent 60%),
@@ -54,9 +41,9 @@ body.popup {
 /* ----- Cards ----- */
 .card {
   background: var(--bgElev);
-  border-radius: var(--radius);
-  border: 1px solid #e8e2d9;
-  box-shadow: var(--cardShadow);
+  border-radius: 0; /* Remove radius on full-height components */
+  border: none;
+  box-shadow: none; /* Remove shadow on full-height components */
   overflow: clip;
 }
 
@@ -67,6 +54,7 @@ body.popup {
   place-items: center;
   padding: 22px 18px 18px;
   background: linear-gradient(180deg, #f7f3ed, #f1ece6);
+  flex-shrink: 0; /* Prevent header from shrinking */
 }
 
 /* Decorative wave under header */
@@ -116,12 +104,14 @@ body.popup {
 
 /* ----- Chat Area ----- */
 .card.chat {
+  flex: 1; 
   display: flex;
   flex-direction: column;
   padding: 12px 14px;
-  background:
-    linear-gradient(180deg, #ffffff, #faf8f5);
+  background: linear-gradient(180deg, #ffffff, #faf8f5);
   position: relative;
+  border-radius: 0;
+  border-bottom: 1px solid #e6e0d7; /* Optional border above input */
 }
 
 /* Gentle diagonal lines low in the chat card */
@@ -140,8 +130,10 @@ body.popup {
   pointer-events: none;
 }
 
+
 .chat-scroll {
-  flex: 1;
+  flex: 1 1 auto; 
+  height: auto; 
   overflow: auto;
   padding-right: 4px;
   scrollbar-width: thin;
@@ -170,15 +162,16 @@ body.popup {
 .bubble.bot { background: #ffffff; color: var(--text); }
 
 /* ----- Input Row ----- */
+/* ----- Input Row (Footer) ----- */
 .input-row {
   display: grid;
   grid-template-columns: 1fr auto;
   gap: 12px;
   padding: 16px;
-  background: linear-gradient(180deg, #f6f2ec, #efeae4);
+  background: var(--bg); /* Use base BG for cleaner transition */
   border-top: 1px solid #e6e0d7;
+  flex-shrink: 0; /* Prevent input from shrinking */
 }
-
 .input {
   display: flex;
   align-items: center;
