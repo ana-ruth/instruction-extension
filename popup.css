@@ -416,3 +416,28 @@ button:focus {
 button:active {
   transform: scale(0.98);          /* Slight press animation */
 }
+
+
+/*textarea*/
+input[type="text"] {
+  width: 85%;
+  padding: 14px 18px;
+  font-size: var(--font-size-base);  /* Consistent with body */
+  border: 2px solid var(--brand-soft);
+  border-radius: var(--radius);      /* Rounded input */
+  background-color: var(--bgElev);
+  color: var(--text);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+input[type="text"]::placeholder {
+  color: var(--muted);
+  font-style: italic;
+}
+
+input[type="text"]:focus {
+  border-color: var(--brand);
+  outline: none;
+  box-shadow: 0 0 0 3px var(--ring);
+}
