@@ -387,3 +387,32 @@ msg-system .bubble {
   /* Distinct color for errors */
   color: #cc0000;
 }
+
+
+
+/*buttons*/
+button {
+  background-color: #0B5ED7;       /* Accessible blue */
+  color: white;                    /* High contrast text */
+  border: none;
+  border-radius: 12px;             /* Smooth rounded corners */
+  padding: 12px 20px;              /* Large click area */
+  font-size: 16px;                 /* Easy to read */
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.2s ease, transform 0.1s ease;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1); /* Gentle depth */
+}
+
+button:hover {
+  background-color: #084298;       /* Darker on hover */
+}
+
+button:focus {
+  outline: 3px solid #FFD54F;      /* High-visibility yellow ring */
+  outline-offset: 2px;
+}
+
+button:active {
+  transform: scale(0.98);          /* Slight press animation */
+}
