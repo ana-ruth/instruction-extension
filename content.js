@@ -17,6 +17,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
     if (message.type === 'GET_CONTEXT') {
         const contextData = scrapeContext();
+        console.log("P2: Scraped Context Data:", contextData);
 
         // Send the scraped data back to the Service Worker (P3)
         sendResponse({ 
@@ -102,8 +103,23 @@ function highlightElement(selector) {
         el.classList.remove('elder-guide-highlight');
         el.style.boxShadow = '';
         el.style.outline = '';
-        el.style.zIndex = '';
+        el.style.zIndex = ''; 
     });
+
+    //fallback
+    if (selector.toLowerCase() === 'document.body') {
+        // Option A (Best): Just scroll to the top/bottom gently and exit.
+        window.scrollTo({ top: document.body.scrollHeight / 2, behavior: 'smooth' });
+        console.log("Guide: Element not found, gentle scroll executed.");
+        return; 
+        
+        /* Option B (Alternative, but often distracting): 
+        Flash a message box overlay on the screen to confirm the instruction, then exit.
+        */
+    }
+
+
+
 
     const targetElement = document.querySelector(selector);
 
