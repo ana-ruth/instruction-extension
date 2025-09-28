@@ -1,31 +1,34 @@
 <!doctype html>
 <html lang="en">
 <head>
-  <meta charset="utf-8">
-  <title>Website Helper</title>
-  <meta name="viewport" content="width=device-width,initial-scale=1">
-  <link rel="stylesheet" href="popup.css">
-
+  <meta charset="utf-8" />
+  <title>Elder Guide</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <link rel="stylesheet" href="popup.css" />
 </head>
-<body>
-<header>
-    <h1>Elder Guide</h1>
+<body class="popup">
+  <header class="card header">
+    <div class="brand">
+  <h1>Elder Guide</h1>
+  <span class="subtitle">Your friendly page helper!</span>
+</div>
+
   </header>
 
-  <main>
-    <section id="chat-history" aria-live="polite">
-      <!-- Messages will be appended here -->
-    </section>
-
-    <form id="chat-form">
-      <label for="user-input">How can i help you?</label><br>
-      <input type="text" id="user-input" placeholder="Ask for guidance..." autocomplete="off" />
-      <button type="submit" id="send-btn">Send</button>
-    </form>
+  <main class="card chat">
+    <section id="chat-history" class="chat-scroll" aria-live="polite"></section>
   </main>
 
-  <!-- JS will be added in next phase -->
-  <script src="popup.js"></script>
+  <form id="chat-form" class="card input-row">
+    <label for="user-input" class="sr-only">How can I help you?</label>
+    <div class="input">
+      <input type="text" id="user-input" placeholder="Ask for guidance..." autocomplete="off" />
+    </div>
+    <button type="submit" id="send-btn" class="btn">Send</button>
+  </form>
 
+  <script src="popup.js"></script>
 </body>
 </html>
+
+
