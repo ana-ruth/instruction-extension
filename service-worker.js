@@ -11,29 +11,26 @@ async function callGeminiApi(question, context) {
 
 
 
-    const systemPrompt = `You are a patient, helpful guide specializing in instructing seniors on website navigation.
-    Your response MUST achieve two goals:
-    1. Provide the SINGLE, most logical next step to help the user achieve their goal.
-    2. Identify the exact CSS selector for the element mentioned in your instruction, using the provided DOM Context.
+    const systemPrompt = `You are a patient, expert, and helpful guide specializing in instructing seniors on website navigation.
+    Your single task is to generate a comprehensive, ordered list of ALL necessary steps to achieve the user's ultimate goal.
+    RESPONSE GUIDELINES:
+    * The final response MUST be a single JSON object containing the "fullPlan" array.
+    * Instructions must be **extremely simple and direct** (e.g., "Type your email here", "Click the 'Next' button").
+    * Each step MUST correspond to an element found in the DOM Context.
+    * If the first necessary element is not found in the DOM Context, the FIRST step's selector MUST be 'document.body' and the instruction must be a prompt to scroll or wait.
 
-    INSTRUCTION GUIDELINES:
-    * Use extremely simple, direct language. Avoid technical terms.
-    * Focus only on the single, immediate next action.
-    
-    RESPONSE FORMATTING:
-    * You MUST respond ONLY with a valid JSON object adhering to the specified schema.
-    * If no relevant element is found in the DOM Context, use 'document.body' for the selector and state, 'The item is not visible right now. Please scroll down.'
 
-    DOM Context:
+    DOM Context (Interactive Elements Available on Page):
     ---
     ${context}
     ---
     
-    User Question: ${question}`;
+    User Goal: ${question}
+    Generate the full step-by-step plan now, ensuring the output adheres strictly to the defined schema.`;
 
 
-       // CONSTRUCT THE API PAYLOAD
-    const payload = {
+       // API PAYLOAD
+const payload = {
         model: "gemini-2.5-flash", 
         contents: [{ 
                     role: "user", 
@@ -44,13 +41,32 @@ async function callGeminiApi(question, context) {
         generationConfig: {
             // CRUCIAL: Forces the model to output a JSON string
             responseMimeType: "application/json",
+            
+            // CHANGE STARTS HERE: Define the expected array structure
             responseSchema: {
                 type: "object",
                 properties: {
-                    instruction: { type: "string", description: "The single, simple instruction for the user." },
-                    selector: { type: "string", description: "The most precise CSS selector for the target element." }
+                    fullPlan: {
+                        type: "array",
+                        description: "A list of ordered steps to complete the user's goal.",
+                        items: { // Define the schema for EACH item in the array
+                            type: "object",
+                            properties: {
+                                // These properties match the structure of a single step
+                                instruction: { 
+                                    type: "string", 
+                                    description: "The simplified, single-action instruction." 
+                                },
+                                selector: { 
+                                    type: "string", 
+                                    description: "The CSS selector for the element." 
+                                }
+                            },
+                            required: ["instruction", "selector"]
+                        }
+                    }
                 },
-                required: ["instruction", "selector"]
+                required: ["fullPlan"] // Only the fullPlan property is required in the root object
             }
         }
     };
@@ -97,8 +113,7 @@ try {
         console.log("Parsed Gemini JSON:", parsedData);
 
         return {
-            instruction: parsedData.instruction,
-            selector: parsedData.selector
+            fullPlan: parsedData.fullPlan 
         };
     } catch (e) {
         console.error("Failed to parse JSON from Gemini text:", jsonText, e);
@@ -118,7 +133,7 @@ try {
 
 const contextCache = {}; 
 
-/////////////////
+
 
 const getContext = (tabId, tabUrl) => {
     // 1. Check cache first
@@ -144,7 +159,7 @@ const getContext = (tabId, tabUrl) => {
             
             // Send the context request to content.js
             chrome.tabs.sendMessage(tabId, { type: 'GET_CONTEXT' }, (response) => {
-                if (chrome.runtime.lastError) {
+                if (chrome.runtime.lastError ) {
                     // This handles errors like "receiving end does not exist" if it still occurs
                     console.error("Failed to receive context response:", chrome.runtime.lastError);
                     reject("Failed to communicate with the page.");
@@ -167,6 +182,30 @@ const getContext = (tabId, tabUrl) => {
 };
 
 
+////////
+
+const CONVERSATION_KEY = 'guideConversation'; // Key for chrome.storage
+
+// Utility function to inject and send the command to P2
+function executeStep(tabId, step) {
+    // This function ensures the script is loaded on the current tab (new or old page)
+    chrome.scripting.executeScript({
+        target: { tabId: tabId },
+        files: ['content.js']
+    }, () => {
+        if (chrome.runtime.lastError) {
+            console.error("Script injection failed:", chrome.runtime.lastError.message);
+            return;
+        }
+        chrome.tabs.sendMessage(tabId, { 
+            type: 'LLM_INSTRUCTION', 
+            selector: step.selector,
+            instruction: step.instruction
+        }).catch(error => {
+            console.error("Error sending highlight command:", error.message);
+        });
+    });
+}
 
 
 
@@ -174,251 +213,112 @@ const getContext = (tabId, tabUrl) => {
 
 ////////////////
 
-// Listener receives messages from popup.js and content.js
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     
-    // --- 1. HANDLE CONTEXT RECEIPT FROM CONTENT.JS ---
+    // 1. HANDLE CONTEXT RECEIPT FROM CONTENT.JS (No major change needed here)
     if (message.type === 'CONTEXT_DATA') {
         const tabId = sender.tab.id;
         contextCache[tabId] = message.context;
-        console.log(`Context received and cached for tab ${tabId}.`);
         sendResponse({ status: "Context cached." });
-        return true; // Keep channel open
+        return true; 
     }
     
-    // --- 2. HANDLE CHAT REQUEST FROM POPUP.JS (The main trigger) ---
-    if (message.type === 'CHAT_REQUEST') {
-        const userQuestion = message.question;
+    // 2. HANDLE CHAT REQUEST / ADVANCE STEP (Primary Logic)
+    if (message.type === 'CHAT_REQUEST' || message.type === 'ADVANCE_STEP') {
         
-        // Find the active tab to execute commands and get context
-        chrome.tabs.query({ active: true, currentWindow: true }, async function(tabs) {
-            
-            const tab = tabs[0];
-            const tabId = tab.id;
-            
-            if (!tab || tab.url.startsWith('chrome://') || tab.url.startsWith('chrome-extension://')) {
-                 sendResponse({ status: "error", instruction: "Extension cannot run on this page." });
-                 return;
-            }
+        // This is a complex asynchronous path.
+        // We use an immediately invoked async function to manage the promises cleanly.
+        (async () => {
+            try {
+                // 1. Get Tab Context (Essential for both requests)
+                const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+                if (tabs.length === 0) {
+                    throw new Error("Please ensure you have an active webpage open.");
+                }
+                const tab = tabs[0];
+                const tabId = tab.id;
 
-
-
-
-
-
-try {
-                // A. Await context data (handles caching, injection, and messaging)
-                let pageContextData = await getContext(tabId, tab.url);
-                
-                // Convert object context to a clean JSON string for the LLM prompt
-                const contextString = JSON.stringify(pageContextData);
-
-                // B. Call the LLM with the *real* context string
-                const llmResponse = await callGeminiApi(userQuestion, contextString);
-
-                // C. Handle LLM errors
-                if (llmResponse.error) {
-                    sendResponse({ status: "error", instruction: llmResponse.error });
-                    return;
+                if (tab.url.startsWith('chrome://') || tab.url.startsWith('chrome-extension://')) {
+                    throw new Error("Extension cannot run on this internal page.");
                 }
 
-                // D. Send instruction back to Popup (P1)
-                sendResponse({ 
-                    status: "success", 
-                    instruction: llmResponse.instruction,
-                    selector: llmResponse.selector // For debug/logging in popup
-                }); 
+                let responseData;
+                let convData = await chrome.storage.local.get(CONVERSATION_KEY);
+                let conv = convData[CONVERSATION_KEY] || {};
                 
-                // E. INJECT AND SEND INSTRUCTION (Final fix for connection errors)
-                chrome.scripting.executeScript({
-                    target: { tabId: tabId },
-                    files: ['content.js'] 
-                }, () => {
-                    if (chrome.runtime.lastError) {
-                        console.error("Script injection failed:", chrome.runtime.lastError.message);
-                        return;
+                // --- A. INITIAL REQUEST: GENERATE NEW PLAN ---
+                if (message.type === 'CHAT_REQUEST') {
+                    
+                    const contextString = JSON.stringify(await getContext(tabId, tab.url));
+                    const llmResponse = await callGeminiApi(message.question, contextString);
+
+                    if (llmResponse.error || !llmResponse.fullPlan || llmResponse.fullPlan.length === 0) {
+                        throw new Error(llmResponse.error || "Could not create a valid plan.");
                     }
                     
-                    // Send the command *after* injection is successful
-                    chrome.tabs.sendMessage(tabId, { 
-                        type: 'LLM_INSTRUCTION', 
-                        selector: llmResponse.selector,
-                        instruction: llmResponse.instruction 
-                    }).catch(error => {
-                        console.error("Error sending highlight command (Post-Injection):", error.message);
-                    });
+                    // Store new plan and start at step 0
+                    conv.plan = llmResponse.fullPlan;
+                    conv.currentStepIndex = 0;
+                    await chrome.storage.local.set({ [CONVERSATION_KEY]: conv });
+
+                    const currentStep = conv.plan[0];
+                    const isLastStep = conv.plan.length === 1;
+                    
+                    responseData = {
+                        status: "success", 
+                        instruction: currentStep.instruction, 
+                        selector: currentStep.selector,
+                        isLastStep: isLastStep
+                    };
+                    executeStep(tabId, currentStep); // Execute step 0 immediately
+
+                // --- B. ADVANCE STEP REQUEST: MOVE TO NEXT STEP ---
+                } else if (message.type === 'ADVANCE_STEP') {
+
+                    if (!conv.plan) {
+                        throw new Error("No active guide plan found. Please start a new chat.");
+                    }
+                    
+                    const nextStepIndex = conv.currentStepIndex + 1;
+                    if (nextStepIndex >= conv.plan.length) {
+                        await chrome.storage.local.remove(CONVERSATION_KEY);
+                        responseData = { status: "complete", instruction: "You have completed all the steps! Guide finished." };
+                    } else {
+                        const nextStep = conv.plan[nextStepIndex];
+                        conv.currentStepIndex = nextStepIndex;
+                        await chrome.storage.local.set({ [CONVERSATION_KEY]: conv });
+                        
+                        const isLast = nextStepIndex === conv.plan.length - 1;
+                        
+                        responseData = { 
+                            status: "success", 
+                            instruction: nextStep.instruction, 
+                            selector: nextStep.selector,
+                            isLastStep: isLast
+                        };
+                        executeStep(tabId, nextStep); // Execute the new step
+                    }
+                }
+                
+                // 3. FINAL RESPONSE: Send the accumulated response data back to the popup (P1)
+                sendResponse(responseData);
+
+            } catch (error) {
+                // Handle ALL errors that occurred during the asynchronous process
+                console.error("Critical error in chat flow:", error.message);
+                
+                // Send a structured error response back to the popup
+                sendResponse({ 
+                    status: "error", 
+                    instruction: `A critical error occurred: ${error.message}` 
                 });
-
-            } catch (e) {
-                // Handle critical failure during context retrieval
-                console.error("Critical error in chat flow:", e);
-                sendResponse({ status: "error", instruction: `A critical error occurred while preparing the guide: ${e}` });
             }
-        }); 
+        })(); // End of immediately invoked async function
 
-        return true; // Keep channel open for the async sendResponse
+        return true; // CRITICAL: Keeps the message port open for the async response
     }
-});
-
-            // A. Check if context is already available
-            // let pageContext = contextCache[tabId];
-            // if (!pageContext) {
-            //      // If not, inject content.js and request context *before* calling the LLM
-            //      // NOTE: For simplicity, we are combining the context gathering and chat in one call here.
-            //      // A more robust app would have the content script send context on load.
-            //      // For now, we'll try to execute and get context first.
-                 
-            //      // Fallback or Initial Context Request: Inject content.js to get the data
-            //      // The actual scraping must be done by P2 and returned via a dedicated message.
-            //      pageContext = `Page URL: ${tab.url}. Current elements: (No context received yet. Using URL only.)`;
-            // }
-
-            // // B. Call the LLM with the question and context
-            // const llmResponse = await callGeminiApi(userQuestion, pageContext);
-
-            // REVISED FLOW
-
-
-
-
-//             if (llmResponse.error) {
-//                 sendResponse({ status: "error", instruction: llmResponse.error });
-//                 return;
-//             }
-
-//             // C. Send instruction back to Popup (P1)
-//             sendResponse({ 
-//                 status: "success", 
-//                 instruction: llmResponse.instruction,
-//                 selector: llmResponse.selector // Send selector to popup for logging/debug
-//             }); 
-            
-// /////////
-
-
-
-// // Inject content.js and then send the message inside the callback
-// chrome.scripting.executeScript({
-//     target: { tabId: tabId },
-//     files: ['content.js'] // Path to your content script
-// }, () => {
-//     // Check for injection errors
-//     if (chrome.runtime.lastError) {
-//         console.error("Script injection failed:", chrome.runtime.lastError.message);
-//         // You should send an error back to the popup here too!
-//         // sendResponse({ status: "error", instruction: "Failed to load guide features on the page." });
-//         return;
-//     }
     
-//     //  THIS IS THE FINAL SEND THAT MUST BE RUN AFTER SCRIPT IS LOADED
-//     chrome.tabs.sendMessage(tabId, { 
-//         type: 'LLM_INSTRUCTION', 
-//         selector: llmResponse.selector,
-//         instruction: llmResponse.instruction // Include instruction for robust P2 logging
-//     }).catch(error => {
-//         // This catch handles errors if the connection immediately closes after sending
-//         console.error("Error sending highlight command (Post-Injection):", error.message);
-//     });
-
-// }); // End of chrome.scripting.executeScript()
-
-// });
-
-
-//         return true; 
-//     }
-// });
-
-
-
-
-
-
-
-/*
-
-function handleChatRequest(question, context) {
-    return {
-        "instruction": "Mock: Click the main search box.",
-        "selector": "#search-box",
-        "llmText": `Guide: I see you are on the page titled: "${context.title}". I suggest you click the main search box.`
-
-    };
-}
-
-// receives messages from popup.js
-chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
- 
-    // receives chat request from popup.js
-    if (message.type === 'CHAT_REQUEST') {
-    const userQuestion = message.question;
-    console.log("Service Worker received query from Popup:", userQuestion);
-
-
-
-    //get active tab in browser
-    chrome.tabs.query({ active: true, currentWindow: true }, function(tabs) {
-            if (tabs.length === 0) {
-                // Handle case where no active tab is found (e.g., user is on chrome://extensions)
-                sendResponse({ status: "error", message: "No active tab to guide." });
-                return;
-            }
-            const tab = tabs[0]
-            const tabId = tab.id;
-
-
-    // Check if the URL is restricted before attempting injection
-    if (tab.url.startsWith('chrome://') || tab.url.startsWith('chrome-extension://')) {
-        console.error("Cannot run script on restricted URL:", tab.url);
-        sendResponse({ 
-            status: "error", 
-            message: "Extension cannot run on this Chrome internal page." 
-        });
-        return; // Stop processing immediately
-    }
-
-
-
-    // *** Mock LLM Response Structure ***
-    const mockResponse = {
-      instruction: "Mock: Click the main search box.",
-      selector: "#search-box",
-      llmText: `Guide: I received your question about "${userQuestion}". I suggest you click the main search box.`
-
-    };
-
-    //send response to popup.js
-    console.log("Service Worker sending mock response to Popup:", mockResponse);
-    sendResponse(mockResponse); // Send back to (popup.js)
-  
-
-    //Inject content.js before sending the command
-    chrome.scripting.executeScript({
-        target: { tabId: tabId },
-        files: ['content.js'] // Path to your content script
-    }, () => {
-        // Check for potential injection errors
-        if (chrome.runtime.lastError) {
-            console.error("Script injection failed:", chrome.runtime.lastError.message);
-            return;
-        }
-        
-        console.log("content.js injected successfully. Sending command now.");
-
-        
-
-        // Send message to content.js to highlight the element
-        chrome.tabs.sendMessage(tabId, { 
-            type: 'GET_CONTEXT', 
-            instruction: mockResponse.instruction, 
-            selector: mockResponse.selector 
-        });
-
-    }); // End of chrome.scripting.executeScript
-
- });
-
-    //return true; // Keep the message channel open for sendResponse
-    }
+    // Return false for any other messages
+    return false;
 });
-*/
+

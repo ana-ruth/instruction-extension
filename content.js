@@ -1,5 +1,7 @@
 // content.js
 // P2's focus: DOM Scraper & Highlighting Logic
+//document.addEventListener('DOMContentLoaded', () => {
+
 
 // message listener to receive commands from the service worker (P3)
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
@@ -32,6 +34,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
 
 });
+
+//}); 
 
 
 function scrapeContext() {
@@ -126,9 +130,9 @@ function highlightElement(selector) {
     if (targetElement) {
         // high-visibility styles
         targetElement.classList.add('elder-guide-highlight');
-        targetElement.style.boxShadow = '0 0 0 5px #FF5733'; // Bright orange/red shadow
-        targetElement.style.outline = '3px solid #C70039'; // Solid outline
-        targetElement.style.zIndex = '999999'; // Ensures visibility over page content
+        targetElement.style.boxShadow = '0 0 0 5px #FF5733 !important'; // Bright orange/red shadow
+        targetElement.style.outline = '3px solid #C70039 !important'; // Solid outline
+        targetElement.style.zIndex = '999999 !important'; // Ensures visibility over page content
 
         // Scroll the highlighted part into view
         targetElement.scrollIntoView({ behavior: 'smooth', block: 'center' });

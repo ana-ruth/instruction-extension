@@ -1,4 +1,3 @@
-/*
 document.addEventListener('DOMContentLoaded', () => {
     
     // Get references to the key UI elements
@@ -6,48 +5,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const userInput = document.getElementById('user-input');
     const chatHistory = document.getElementById('chat-history'); 
 
-    // Attach the event listener to the Send button
-    sendButton.addEventListener('click', () => {
-        
-        // Get the value (the user's question) from the input field
-        const question = userInput.value.trim();
-
-        if (question === "") {
-            // Prevent sending empty messages
-            console.log("Input is empty. Skipping message send.");
-            return;
-        }
-
-        console.log(`P1 sending message to P3: ${question}`);
-
-        // 3. Send the message to the Service Worker (P3)
-        chrome.runtime.sendMessage({
-            type: 'CHAT_REQUEST',
-            question: question
-        }, 
-        // 4. Callback function to handle the response from P3
-        (response) => {
-            // P1 verifies the communication works by logging the mock response
-            console.log("✅ Mock Response received from P3 (Service Worker):", response);
-            
-            // In Phase 2, P1 will update the #chat-history div here
-            // Example: displayMessage(response.llmText);
-        });
-        
-        // Clear the input field after sending
-        userInput.value = '';
-    });
-});
-*/
-
-// popup.js
-
-document.addEventListener('DOMContentLoaded', () => {
-    
-    // Get references to the key UI elements
-    const sendButton = document.getElementById('send-btn');
-    const userInput = document.getElementById('user-input');
-    const chatHistory = document.getElementById('chat-history'); 
+    // Next Step elements
+    const nextStepContainer = document.getElementById('next-step-container'); 
+    const nextStepBtn = document.getElementById('next-step-btn'); 
 
     // Add initial system message (Accessibility)
     appendMessage("system", "Hello! Ask me how to perform an action on this page.");
@@ -60,8 +20,38 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
+    nextStepBtn.addEventListener('click', handleAdvanceStep);
+
+
+    // --- ADVANCE STEP HANDLER ---
+
+    function handleAdvanceStep() {
+        // Disable button immediately to prevent double-clicks
+        nextStepBtn.disabled = true; 
+        
+        const advanceLoadingMessage = appendMessage("system", "Guide preparing next step...", true);
+        
+        // Send the advance request to the Service Worker
+        chrome.runtime.sendMessage({
+            type: 'ADVANCE_STEP'
+        }, (response) => {
+            // Remove loading indicator immediately upon receiving any response
+            advanceLoadingMessage.remove(); 
+            
+            if (chrome.runtime.lastError) {
+                console.error("Popup Error:", chrome.runtime.lastError.message);
+                appendMessage("error", "Error: Connection lost during step advance.");
+                sendButton.disabled = false;
+                return;
+            }
+
+            processResponse(response);
+        });
+    }
+
+
     /**
-     * Handles the user sending a message.
+     * Handles the user sending a message (CHAT_REQUEST).
      */
     function handleSend() {
         const question = userInput.value.trim();
@@ -75,57 +65,85 @@ document.addEventListener('DOMContentLoaded', () => {
         appendMessage("user", question);
         userInput.value = '';
 
+        sendButton.disabled = true; 
+        nextStepBtn.disabled = true; 
+
         // 2. Display a loading message while waiting for the LLM
-        const loadingMessage = appendMessage("system", "Guide is thinking...", true);
+        const initialLoadingMessage = appendMessage("system", "Guide is thinking...", true);
 
         // 3. Send message to the Service Worker (P3)
         chrome.runtime.sendMessage({
             type: 'CHAT_REQUEST',
             question: question
-        }, 
-        // 4. Callback function to handle the response from P3
-        (response) => {
-            // Remove the loading indicator immediately
-            loadingMessage.remove(); 
+        },(response) => {
+            
+            // Remove the specific loading indicator that was created
+            initialLoadingMessage.remove(); 
             
             if (chrome.runtime.lastError) {
                 console.error("Popup Error:", chrome.runtime.lastError.message);
                 appendMessage("error", "Error: Lost connection to the guide service. Please reload the extension.");
+                sendButton.disabled = false;
                 return;
             }
 
-            // 5. Process and display LLM's response
-            if (response && response.status === "success") {
-                // P3 sends back instruction and selector
-                const instructionText = response.instruction;
-                
-                // Final display of the LLM's instruction
-                appendMessage("system", instructionText);
-
-                // Log the selector for debug (P4)
-                console.log("Popup received target selector:", response.selector);
-
-            } else {
-                // Display error from the Service Worker/LLM
-                const errorText = response.instruction || "Could not complete the request. Try asking a simple question.";
-                appendMessage("error", errorText);
-                console.error("LLM Request Failed:", response);
-            }
+            // Call the shared function to display the result and control the flow
+            processResponse(response);
         });
     }
 
+
     /**
-     * Appends a message to the chat history container. (P1's core display utility)
+     * CRITICAL: Processes the response from the Service Worker for BOTH CHAT_REQUEST and ADVANCE_STEP.
+     */
+    function processResponse(response) {
+        
+        if (response.status === "success") {
+            // New instruction received (Step 1 or Step N)
+            appendMessage("system", response.instruction);
+            
+            // Enable next step controls
+            nextStepBtn.innerText = response.isLastStep ? "Finish Guide" : "Done with this step? Next →";
+            nextStepBtn.disabled = false;
+            nextStepContainer.style.display = 'block';
+            sendButton.disabled = true; // Keep chat disabled during flow
+
+            // Log the selector for debug (P4)
+            console.log("Popup received target selector:", response.selector);
+
+        } else if (response.status === "complete") {
+            // Plan finished or no plan found (End of conversation)
+            appendMessage("system", response.instruction);
+            
+            // Reset UI for a new conversation
+            nextStepContainer.style.display = 'none';
+            sendButton.disabled = false; // Allow new chat requests
+
+        } else {
+            // LLM/API Error (status is 'error' or unrecognized)
+            const errorText = response.instruction || "An unknown error occurred. Try again.";
+            appendMessage("error", errorText);
+
+            // Reset UI for a new conversation
+            sendButton.disabled = false; 
+            nextStepContainer.style.display = 'none';
+        }
+    }
+
+
+    /**
+     * Appends a message to the chat history container (Utility function).
      */
     function appendMessage(role, text, isLoading = false) {
         const messageElement = document.createElement('div');
         messageElement.classList.add('message', `${role}-message`);
         
-        // Ensure text is clearly readable and handles line breaks
+        // Use innerText for security and clean display
         messageElement.innerText = text;
 
         if (isLoading) {
-            messageElement.id = 'loading-indicator';
+            // Use a unique ID for easy removal
+            messageElement.id = 'loading-indicator'; 
         }
 
         chatHistory.appendChild(messageElement);
