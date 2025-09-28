@@ -1,14 +1,14 @@
 
 function speakInstruction(text) {
-        if ('speechSynthesis' in window) {
-            window.speechSynthesis.cancel();
-            const utterance = new SpeechSynthesisUtterance(text);
-            utterance.rate = 0.9;
-            window.speechSynthesis.speak(utterance);
-        } else {
-            console.warn("TTS not supported.");
-        }
-    }////////////
+    if ('speechSynthesis' in window) {
+        window.speechSynthesis.cancel();
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.rate = 0.9;
+        window.speechSynthesis.speak(utterance);
+    } else {
+        console.warn("TTS not supported.");
+    }
+}
 
 
 
@@ -16,19 +16,19 @@ function speakInstruction(text) {
 
 document.addEventListener('DOMContentLoaded', () => {
 
-    // Get references to the key UI elements
+    // Getting references to the key UI elements
     const sendButton = document.getElementById('send-btn');
     const userInput = document.getElementById('user-input');
     const chatHistory = document.getElementById('chat-history');
 
-    // Next Step elements
+    // more elements
     const nextStepContainer = document.getElementById('next-step-container');
     const nextStepBtn = document.getElementById('next-step-btn');
 
-    // Add initial system message (Accessibility)
+    // initial system message (Accessibility)
     appendMessage("system", "Hello! Ask me how to perform an action on this page.");
 
-    // Attach listeners
+    //  listeners attaching
     sendButton.addEventListener('click', handleSend);
     userInput.addEventListener('keypress', (e) => {
         if (e.key === 'Enter') {
@@ -39,19 +39,18 @@ document.addEventListener('DOMContentLoaded', () => {
     nextStepBtn.addEventListener('click', handleAdvanceStep);
 
 
-    // --- ADVANCE STEP HANDLER ---
 
     function handleAdvanceStep() {
-        // Disable button immediately to prevent double-clicks
+        // this prevents double-clicks
         nextStepBtn.disabled = true;
 
         const advanceLoadingMessage = appendMessage("system", "Guide preparing next step...", true);
 
-        // Send the advance request to the Service Worker
+        // Sends the advance request to the Service Worker
         chrome.runtime.sendMessage({
             type: 'ADVANCE_STEP'
         }, (response) => {
-            // Remove loading indicator immediately upon receiving any response
+            // Removing the loading indicator immediately after receiving a response
             advanceLoadingMessage.remove();
 
             if (chrome.runtime.lastError) {
@@ -78,14 +77,14 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        // 1. Display and clear user's question
+        // user's question are displayed
         appendMessage("user", question);
         userInput.value = '';
 
         sendButton.disabled = true;
         nextStepBtn.disabled = true;
 
-        // 2. Display a loading message while waiting for the LLM
+        //  loading message while waiting for the LLM
         const initialLoadingMessage = appendMessage("system", "Guide is thinking...", true);
 
         // 3. Send message to the Service Worker (P3)
@@ -117,9 +116,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
 
-    /**
-     * CRITICAL: Processes the response from the Service Worker for BOTH CHAT_REQUEST and ADVANCE_STEP.
-     */
+
     function processResponse(response) {
 
         if (response.status === "success") {
@@ -155,21 +152,18 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
 
-    /**
-     * Appends a message to the chat history container (Utility function).
-     */
     function appendMessage(role, text, isLoading = false) {
         const chatHistory = document.getElementById('chat-history');
         const messageElement = document.createElement('div');
 
-        // 1. Add the container class
+        //  Add the container class
         messageElement.classList.add('msg');
 
-        // 2. Create the bubble element
+        //  Create the bubble element
         const bubbleElement = document.createElement('div');
         bubbleElement.classList.add('bubble');
 
-        // 3. Apply role-specific classes
+        // Apply role-specific classes
         if (role === 'user') {
             bubbleElement.classList.add('user');
             // Add a class to the outer container for right alignment (see CSS below)

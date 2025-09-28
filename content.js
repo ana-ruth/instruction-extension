@@ -120,9 +120,7 @@ function highlightElement(selector) {
         console.log("Guide: Element not found, gentle scroll executed.");
         return;
 
-        /* Option B (Alternative, but often distracting): 
-        Flash a message box overlay on the screen to confirm the instruction, then exit.
-        */
+
     }
 
 

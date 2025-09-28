@@ -12,7 +12,7 @@ chrome.runtime.onInstalled.addListener(() => {
 
 async function callGeminiApi(question, context) {
     if (!GEMINI_API_KEY || GEMINI_API_KEY === 'YOUR_PLACEHOLDER_KEY') {
-        // Handle the case where the key is missing (e.g., in a development environment)
+        // Handles the case where the key is missing 
         console.error("API Key is not configured correctly in config.js.");
 
         return { error: "Developer API Key is not configured." };
@@ -38,37 +38,37 @@ async function callGeminiApi(question, context) {
     Generate the full step-by-step plan now, ensuring the output adheres strictly to the defined schema.`;
 
 
-       // API PAYLOAD
-const payload = {
-        model: "gemini-2.5-flash", 
-        contents: [{ 
-                    role: "user", 
-                    parts: [{ 
-                        text: systemPrompt 
-                    }] 
-                }],
+    // API PAYLOAD
+    const payload = {
+        model: "gemini-2.5-flash",
+        contents: [{
+            role: "user",
+            parts: [{
+                text: systemPrompt
+            }]
+        }],
         generationConfig: {
-            // CRUCIAL: Forces the model to output a JSON string
+            // Forces the model to output a JSON string
             responseMimeType: "application/json",
-            
-            // CHANGE STARTS HERE: Define the expected array structure
+
+            // the expected array structure
             responseSchema: {
                 type: "object",
                 properties: {
                     fullPlan: {
                         type: "array",
                         description: "A list of ordered steps to complete the user's goal.",
-                        items: { // Define the schema for EACH item in the array
+                        items: { //structure for EACH item in the array
                             type: "object",
                             properties: {
                                 // These properties match the structure of a single step
-                                instruction: { 
-                                    type: "string", 
-                                    description: "The simplified, single-action instruction." 
+                                instruction: {
+                                    type: "string",
+                                    description: "The simplified, single-action instruction."
                                 },
-                                selector: { 
-                                    type: "string", 
-                                    description: "The CSS selector for the element." 
+                                selector: {
+                                    type: "string",
+                                    description: "The CSS selector for the element."
                                 }
                             },
                             required: ["instruction", "selector"]
@@ -85,52 +85,52 @@ const payload = {
 
     //fetch call to Gemini API
 
-try { 
-    const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`,
-        {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload)
-
-        }
-    );
-    
-
-    if (!response.ok) {
-        const errorDetails = await response.text();
-        console.error("Gemini API Error:", response.status, errorDetails);
-        return { error: `API Error: ${response.status}` };
-    }
-
-    const data = await response.json();
-    console.log("Raw Gemini API Response:", data);
-
-    const jsonText = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-        //const parsedData = JSON.parse(jsonText); 
-        
-        if (!jsonText) {
-        console.error("Gemini Response Missing Text/Content. Full response:", data);
-        return { 
-            error: "The guide couldn't generate a response for this request. Please try rephrasing." 
-        };
-    }
-
-
     try {
-        const parsedData = JSON.parse(jsonText); 
-        console.log("Parsed Gemini JSON:", parsedData);
+        const response = await fetch(
+            `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`,
+            {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
 
-        return {
-            fullPlan: parsedData.fullPlan 
-        };
-    } catch (e) {
-        console.error("Failed to parse JSON from Gemini text:", jsonText, e);
-        return { error: "Failed to read guide instructions. Please ask again." };
-    }
+            }
+        );
 
 
-        
+        if (!response.ok) {
+            const errorDetails = await response.text();
+            console.error("Gemini API Error:", response.status, errorDetails);
+            return { error: `API Error: ${response.status}` };
+        }
+
+        const data = await response.json();
+        console.log("Raw Gemini API Response:", data);
+
+        const jsonText = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+        //const parsedData = JSON.parse(jsonText); 
+
+        if (!jsonText) {
+            console.error("Gemini Response Missing Text/Content. Full response:", data);
+            return {
+                error: "The guide couldn't generate a response for this request. Please try rephrasing."
+            };
+        }
+
+
+        try {
+            const parsedData = JSON.parse(jsonText);
+            console.log("Parsed Gemini JSON:", parsedData);
+
+            return {
+                fullPlan: parsedData.fullPlan
+            };
+        } catch (e) {
+            console.error("Failed to parse JSON from Gemini text:", jsonText, e);
+            return { error: "Failed to read guide instructions. Please ask again." };
+        }
+
+
+
     } catch (error) {
         console.error("LLM API Call Failed:", error);
         return { error: "Error contacting the guide service. Please try again." };
@@ -140,22 +140,22 @@ try {
 
 
 
-const contextCache = {}; 
+const contextCache = {};
 
 
 
 const getContext = (tabId, tabUrl) => {
-    // 1. Check cache first
+    // Check cache first
     if (contextCache[tabId]) {
         console.log("Context found in cache.");
         return Promise.resolve(contextCache[tabId]);
     }
-    
-    // 2. If not in cache, request it from content.js
+
+    //  If not in cache, request it from content.js
     console.log("Context missing. Injecting script to get context.");
-    
+
     return new Promise((resolve, reject) => {
-        
+
         // Inject content.js (if not already injected)
         chrome.scripting.executeScript({
             target: { tabId: tabId },
@@ -165,21 +165,21 @@ const getContext = (tabId, tabUrl) => {
                 console.error("Context script injection failed:", chrome.runtime.lastError.message);
                 return reject("Failed to load guide features.");
             }
-            
+
             // Send the context request to content.js
             chrome.tabs.sendMessage(tabId, { type: 'GET_CONTEXT' }, (response) => {
-                if (chrome.runtime.lastError ) {
+                if (chrome.runtime.lastError) {
                     // This handles errors like "receiving end does not exist" if it still occurs
                     console.error("Failed to receive context response:", chrome.runtime.lastError);
                     reject("Failed to communicate with the page.");
                 } else if (!response || response.type !== 'CONTEXT_RESPONSE') {
                     // This handles if content.js sends an unexpected or empty response
-                     resolve({
+                    resolve({
                         pageTitle: 'Fallback Context',
                         pageURL: tabUrl,
                         interactiveElements: [],
                         elementCount: 0
-                    }); 
+                    });
                 } else {
                     // SUCCESS: Context is received
                     contextCache[tabId] = response.context; // Cache for next time
@@ -195,9 +195,9 @@ const getContext = (tabId, tabUrl) => {
 
 const CONVERSATION_KEY = 'guideConversation'; // Key for chrome.storage
 
-// Utility function to inject and send the command to P2
+// Utility function to inject and send the commands to content.js
 function executeStep(tabId, step, shouldSpeak = false) {
-    // This function ensures the script is loaded on the current tab (new or old page)
+    // This function makes the script load on the current tab (new or old page)
     chrome.scripting.executeScript({
         target: { tabId: tabId },
         files: ['content.js']
@@ -206,8 +206,8 @@ function executeStep(tabId, step, shouldSpeak = false) {
             console.error("Script injection failed:", chrome.runtime.lastError.message);
             return;
         }
-        chrome.tabs.sendMessage(tabId, { 
-            type: 'LLM_INSTRUCTION', 
+        chrome.tabs.sendMessage(tabId, {
+            type: 'LLM_INSTRUCTION',
             selector: step.selector,
             instruction: step.instruction,
             shouldSpeak: shouldSpeak////////
@@ -224,18 +224,18 @@ function executeStep(tabId, step, shouldSpeak = false) {
 ////////////////
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-    
-    // 1. HANDLE CONTEXT RECEIPT FROM CONTENT.JS (No major change needed here)
+
+    // HANDLE CONTEXT RECEIPT FROM CONTENT.JS 
     if (message.type === 'CONTEXT_DATA') {
         const tabId = sender.tab.id;
         contextCache[tabId] = message.context;
         sendResponse({ status: "Context cached." });
-        return true; 
+        return true;
     }
-    
-    // 2. HANDLE CHAT REQUEST / ADVANCE STEP (Primary Logic)
+
+    //  HANDLE CHAT REQUEST 
     if (message.type === 'CHAT_REQUEST' || message.type === 'ADVANCE_STEP') {
-        
+
         // This is a complex asynchronous path.
         // We use an immediately invoked async function to manage the promises cleanly.
         (async () => {
@@ -255,17 +255,17 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                 let responseData;
                 let convData = await chrome.storage.local.get(CONVERSATION_KEY);
                 let conv = convData[CONVERSATION_KEY] || {};
-                
-                // --- A. INITIAL REQUEST: GENERATE NEW PLAN ---
+
+                // chat request from the machine
                 if (message.type === 'CHAT_REQUEST') {
-                    
+
                     const contextString = JSON.stringify(await getContext(tabId, tab.url));
                     const llmResponse = await callGeminiApi(message.question, contextString);
 
                     if (llmResponse.error || !llmResponse.fullPlan || llmResponse.fullPlan.length === 0) {
                         throw new Error(llmResponse.error || "Could not create a valid plan.");
                     }
-                    
+
                     // Store new plan and start at step 0
                     conv.plan = llmResponse.fullPlan;
                     conv.currentStepIndex = 0;
@@ -273,22 +273,22 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
                     const currentStep = conv.plan[0];
                     const isLastStep = conv.plan.length === 1;
-                    
+
                     responseData = {
-                        status: "success", 
-                        instruction: currentStep.instruction, 
+                        status: "success",
+                        instruction: currentStep.instruction,
                         selector: currentStep.selector,
                         isLastStep: isLastStep
                     };
                     executeStep(tabId, currentStep, true); // Execute step 0 immediately
 
-                // --- B. ADVANCE STEP REQUEST: MOVE TO NEXT STEP ---
+                    // -ADVANCE STEP REQUEST: MOVE TO NEXT STEP ---
                 } else if (message.type === 'ADVANCE_STEP') {
 
                     if (!conv.plan) {
                         throw new Error("No active guide plan found. Please start a new chat.");
                     }
-                    
+
                     const nextStepIndex = conv.currentStepIndex + 1;
                     if (nextStepIndex >= conv.plan.length) {
                         await chrome.storage.local.remove(CONVERSATION_KEY);
@@ -297,37 +297,37 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                         const nextStep = conv.plan[nextStepIndex];
                         conv.currentStepIndex = nextStepIndex;
                         await chrome.storage.local.set({ [CONVERSATION_KEY]: conv });
-                        
+
                         const isLast = nextStepIndex === conv.plan.length - 1;
-                        
-                        responseData = { 
-                            status: "success", 
-                            instruction: nextStep.instruction, 
+
+                        responseData = {
+                            status: "success",
+                            instruction: nextStep.instruction,
                             selector: nextStep.selector,
                             isLastStep: isLast
                         };
                         executeStep(tabId, nextStep); // Execute the new step
                     }
                 }
-                
+
                 // 3. FINAL RESPONSE: Send the accumulated response data back to the popup (P1)
                 sendResponse(responseData);
 
             } catch (error) {
                 // Handle ALL errors that occurred during the asynchronous process
                 console.error("Critical error in chat flow:", error.message);
-                
+
                 // Send a structured error response back to the popup
-                sendResponse({ 
-                    status: "error", 
-                    instruction: `A critical error occurred: ${error.message}` 
+                sendResponse({
+                    status: "error",
+                    instruction: `A critical error occurred: ${error.message}`
                 });
             }
         })(); // End of immediately invoked async function
 
-        return true; // CRITICAL: Keeps the message port open for the async response
+        return true; // Keeps the message port open for the async response
     }
-    
+
     // Return false for any other messages
     return false;
 });
