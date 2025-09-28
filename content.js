@@ -22,14 +22,14 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         console.log("P2: Scraped Context Data:", contextData);
 
         // Send the scraped data back to the Service Worker (P3)
-        sendResponse({ 
-            type: 'CONTEXT_RESPONSE', 
-            context: contextData 
+        sendResponse({
+            type: 'CONTEXT_RESPONSE',
+            context: contextData
         });
-        
+
         // Must return true to signal Chrome that sendResponse will be called asynchronously.
         // Even though scrapeContext is synchronous, the messaging flow is asynchronous.
-        return true; 
+        return true;
     }
 
 
@@ -107,7 +107,7 @@ function highlightElement(selector) {
         el.classList.remove('elder-guide-highlight');
         el.style.boxShadow = '';
         el.style.outline = '';
-        el.style.zIndex = ''; 
+        el.style.zIndex = '';
     });
 
     //fallback
@@ -115,8 +115,8 @@ function highlightElement(selector) {
         // Option A (Best): Just scroll to the top/bottom gently and exit.
         window.scrollTo({ top: document.body.scrollHeight / 2, behavior: 'smooth' });
         console.log("Guide: Element not found, gentle scroll executed.");
-        return; 
-        
+        return;
+
         /* Option B (Alternative, but often distracting): 
         Flash a message box overlay on the screen to confirm the instruction, then exit.
         */
@@ -130,9 +130,9 @@ function highlightElement(selector) {
     if (targetElement) {
         // high-visibility styles
         targetElement.classList.add('elder-guide-highlight');
-        targetElement.style.boxShadow = '0 0 0 5px #FF5733 !important'; // Bright orange/red shadow
-        targetElement.style.outline = '3px solid #C70039 !important'; // Solid outline
-        targetElement.style.zIndex = '999999 !important'; // Ensures visibility over page content
+        targetElement.style.boxShadow = '0 0 0 5px #FF5733'; // Bright orange/red shadow
+        targetElement.style.outline = '3px solid #C70039'; // Solid outline
+        targetElement.style.zIndex = '999999'; // Ensures visibility over page content
 
         // Scroll the highlighted part into view
         targetElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
