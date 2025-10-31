@@ -14,6 +14,9 @@ It provides:
 
 This extension empowers elders to browse independently, confidently, and safely.
 
+## 📹 Video Demo
+https://www.youtube.com/watch?v=YmaPLUpGQpY
+
 ## ⭐️ Some Key Features: 
 - Text-to-speech
 - Highlights where to insert your information
