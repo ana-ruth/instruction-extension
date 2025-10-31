@@ -1,9 +1,9 @@
-# GuideMe 👵
+# Guide Me 
 ## Instruction Chrome Extension
-Guide Me is a browser extension designed to make the internet more accessible and user-friendly for older adults. It simplifies navigation, highlights where they need to input their information, and provides clear guidance for common online tasks.
+Guide Me is a browser extension designed to make the internet more accessible and user-friendly. It simplifies navigation, highlights where they need to input their information, and provides clear guidance for common online tasks.
 
 ## 🌱 About:
-The internet can be overwhelming for seniors, with cluttered layouts, small text, and complex menus. ElderNet Helper is built to remove those barriers.
+The internet can be overwhelming for seniors, with cluttered layouts, small text, and complex menus. Guide Me is built to remove those barriers.
 It provides:
 
 - Simplified navigation
